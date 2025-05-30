@@ -49,8 +49,19 @@ function getSessionStatus(sessionId) {
     if (!session) return 'DISCONNECTED';
     
     if (session.isAuthenticated) return 'AUTHENTICATED';
-    if (session.socket?.ws?.readyState === 1) return 'CONNECTED';
-    if (session.socket?.ws?.readyState === 0) return 'CONNECTING';
+    
+    // Check WebSocket status more thoroughly
+    if (session.socket?.ws) {
+        const wsState = session.socket.ws.readyState;
+        switch (wsState) {
+            case 0: return 'CONNECTING';
+            case 1: return 'CONNECTED';
+            case 2: return 'CLOSING';
+            case 3: return 'DISCONNECTED';
+            default: return 'UNKNOWN';
+        }
+    }
+    
     return 'DISCONNECTED';
 }
 
@@ -162,15 +173,47 @@ async function createWhatsAppConnection(sessionId, options = {}) {
             sessionQRs.delete(sessionId);
         }
         
+        // Clean up auth directory if exists and corrupted
+        if (fs.existsSync(authDir)) {
+            try {
+                // Check if auth is corrupted by trying to read it
+                const files = fs.readdirSync(authDir);
+                if (files.length === 0) {
+                    console.log(`Removing empty auth directory: ${authDir}`);
+                    fs.rmSync(authDir, { recursive: true, force: true });
+                }
+            } catch (error) {
+                console.log(`Removing corrupted auth directory: ${authDir}`);
+                fs.rmSync(authDir, { recursive: true, force: true });
+            }
+        }
+        
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
         
         await createSessionRecord(sessionId);
         
+        // Enhanced socket configuration
         const socket = makeWASocket({
             auth: state,
             logger,
             printQRInTerminal: false,
-            browser: ['WhatsApp API', 'Chrome', '1.0.0'],
+            browser: ['WhatsApp Multi-Session API', 'Chrome', '3.0.0'],
+            defaultQueryTimeoutMs: 60000,
+            keepAliveIntervalMs: 30000,
+            connectTimeoutMs: 60000,
+            qrTimeout: 40000,
+            emitOwnEvents: true,
+            fireInitQueries: true,
+            generateHighQualityLinkPreview: true,
+            syncFullHistory: false,
+            shouldSyncHistoryMessage: () => false,
+            markOnlineOnConnect: false,
+            retryRequestDelayMs: 250,
+            maxMsgRetryCount: 5,
+            appStateMacVerification: {
+                patch: true,
+                snapshot: true
+            },
             ...options
         });
 
@@ -178,45 +221,107 @@ async function createWhatsAppConnection(sessionId, options = {}) {
             socket,
             isAuthenticated: false,
             authDir,
-            status: 'connecting'
+            status: 'connecting',
+            startTime: Date.now()
         };
 
         sessions.set(sessionId, sessionData);
 
-        // Event handler untuk QR Code
+        // Enhanced event handler untuk connection updates
         socket.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
+            const { connection, lastDisconnect, qr, isNewLogin, isOnline } = update;
+            
+            console.log(`[${sessionId}] Connection update:`, {
+                connection,
+                isNewLogin,
+                isOnline,
+                hasQR: !!qr,
+                lastDisconnect: lastDisconnect?.error?.message
+            });
             
             if (qr) {
-                console.log(`QR Code received for session ${sessionId}`);
-                const qrImage = await qrcode.toDataURL(qr);
-                sessionQRs.set(sessionId, qrImage);
-                await updateSessionStatus(sessionId, 'waiting_qr_scan');
+                console.log(`[${sessionId}] QR Code received, generating data URL...`);
+                try {
+                    const qrImage = await qrcode.toDataURL(qr, {
+                        margin: 2,
+                        width: 256,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    });
+                    sessionQRs.set(sessionId, qrImage);
+                    await updateSessionStatus(sessionId, 'waiting_qr_scan');
+                    console.log(`[${sessionId}] QR Code generated and stored`);
+                } catch (qrError) {
+                    console.error(`[${sessionId}] Error generating QR code:`, qrError);
+                }
             }
             
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log(`Connection closed for session ${sessionId} due to`, lastDisconnect?.error, ', reconnecting', shouldReconnect);
+                const statusCode = lastDisconnect?.error?.output?.statusCode;
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                
+                console.log(`[${sessionId}] Connection closed:`, {
+                    statusCode,
+                    reason: Object.keys(DisconnectReason).find(key => DisconnectReason[key] === statusCode),
+                    shouldReconnect,
+                    error: lastDisconnect?.error?.message
+                });
                 
                 await updateSessionStatus(sessionId, 'disconnected');
                 sessionData.isAuthenticated = false;
-                sessionQRs.delete(sessionId); // Clear QR when disconnected
+                sessionQRs.delete(sessionId);
                 
                 if (shouldReconnect) {
-                    setTimeout(() => createWhatsAppConnection(sessionId, options), 5000);
+                    console.log(`[${sessionId}] Attempting reconnection in 5 seconds...`);
+                    setTimeout(() => {
+                        console.log(`[${sessionId}] Reconnecting...`);
+                        createWhatsAppConnection(sessionId, options);
+                    }, 5000);
                 } else {
+                    console.log(`[${sessionId}] Session logged out, cleaning up...`);
                     sessions.delete(sessionId);
                     sessionQRs.delete(sessionId);
+                    // Clean up auth directory on logout
+                    if (fs.existsSync(authDir)) {
+                        fs.rmSync(authDir, { recursive: true, force: true });
+                    }
                 }
+            } else if (connection === 'connecting') {
+                console.log(`[${sessionId}] Connecting to WhatsApp...`);
+                await updateSessionStatus(sessionId, 'connecting');
             } else if (connection === 'open') {
-                console.log(`WhatsApp connection opened for session ${sessionId}`);
+                console.log(`[${sessionId}] WhatsApp connection opened successfully`);
                 sessionData.isAuthenticated = true;
-                sessionQRs.delete(sessionId); // Clear QR when authenticated
+                sessionQRs.delete(sessionId);
                 await updateSessionStatus(sessionId, 'connected');
+                
+                // Get and log connection info
+                try {
+                    const info = socket.user;
+                    console.log(`[${sessionId}] Authenticated as:`, {
+                        id: info?.id,
+                        name: info?.name,
+                        isOnline
+                    });
+                } catch (error) {
+                    console.log(`[${sessionId}] Could not get user info:`, error.message);
+                }
             }
         });
 
-        // Event handler untuk pesan masuk
+        // Enhanced event handler untuk credentials update
+        socket.ev.on('creds.update', async () => {
+            try {
+                await saveCreds();
+                console.log(`[${sessionId}] Credentials updated and saved`);
+            } catch (error) {
+                console.error(`[${sessionId}] Error saving credentials:`, error);
+            }
+        });
+
+        // Event handler untuk pesan masuk (unchanged)
         socket.ev.on('messages.upsert', async (messageUpdate) => {
             const { messages } = messageUpdate;
             
@@ -264,11 +369,19 @@ async function createWhatsAppConnection(sessionId, options = {}) {
             }
         });
 
-        socket.ev.on('creds.update', saveCreds);
+        // Add error handler
+        socket.ev.on('socket.error', (error) => {
+            console.error(`[${sessionId}] Socket error:`, error);
+        });
 
         return sessionData;
     } catch (error) {
-        console.error(`Error creating WhatsApp connection for session ${sessionId}:`, error);
+        console.error(`[${sessionId}] Error creating WhatsApp connection:`, error);
+        
+        // Clean up on error
+        sessions.delete(sessionId);
+        sessionQRs.delete(sessionId);
+        
         throw error;
     }
 }
@@ -404,27 +517,36 @@ app.post('/sessions/add', authenticateApiKey, async (req, res) => {
                 });
             }
             
-            // If no QR available, we'll continue to recreate the session
-            console.log(`Session ${sessionId} exists but no QR available, recreating...`);
+            console.log(`[${sessionId}] Session exists but no QR available, recreating...`);
         }
+        
+        console.log(`[${sessionId}] Creating new WhatsApp connection...`);
         
         // Create or recreate the session
         await createWhatsAppConnection(sessionId, options);
         
-        // Wait for QR code generation
+        // Wait for QR code generation with improved timeout handling
         let attempts = 0;
-        const maxAttempts = 10; // 5 seconds total wait time
+        const maxAttempts = 20; // 10 seconds total wait time
         
         const waitForQR = () => {
             return new Promise((resolve) => {
                 const checkQR = () => {
+                    const session = sessions.get(sessionId);
                     const qr = sessionQRs.get(sessionId);
+                    
                     if (qr) {
+                        console.log(`[${sessionId}] QR code found after ${attempts * 500}ms`);
                         resolve(qr);
+                    } else if (session && session.isAuthenticated) {
+                        console.log(`[${sessionId}] Session authenticated while waiting for QR`);
+                        resolve('authenticated');
                     } else if (attempts < maxAttempts) {
                         attempts++;
-                        setTimeout(checkQR, 500); // Check every 500ms
+                        setTimeout(checkQR, 500);
                     } else {
+                        console.log(`[${sessionId}] QR wait timeout after ${maxAttempts * 500}ms`);
+                        console.log(`[${sessionId}] Session status:`, getSessionStatus(sessionId));
                         resolve(null);
                     }
                 };
@@ -432,38 +554,49 @@ app.post('/sessions/add', authenticateApiKey, async (req, res) => {
             });
         };
         
-        const qr = await waitForQR();
+        const qrResult = await waitForQR();
         
-        if (qr) {
-            res.json({
+        if (qrResult === 'authenticated') {
+            return res.json({
                 success: true,
-                qr: qr,
+                message: 'Session authenticated successfully',
+                sessionId: sessionId,
+                status: 'AUTHENTICATED'
+            });
+        } else if (qrResult) {
+            return res.json({
+                success: true,
+                qr: qrResult,
                 message: 'QR code generated successfully',
                 sessionId: sessionId,
                 status: getSessionStatus(sessionId)
             });
         } else {
-            // Check if session became authenticated during wait
-            const sessionData = sessions.get(sessionId);
-            if (sessionData && sessionData.isAuthenticated) {
-                res.json({
-                    success: true,
-                    message: 'Session authenticated successfully',
-                    sessionId: sessionId,
-                    status: 'AUTHENTICATED'
-                });
-            } else {
-                res.json({
-                    success: true,
-                    message: 'Session created, waiting for QR code generation...',
-                    sessionId: sessionId,
-                    status: getSessionStatus(sessionId)
-                });
+            // QR timeout - check current status
+            const currentStatus = getSessionStatus(sessionId);
+            const session = sessions.get(sessionId);
+            
+            console.log(`[${sessionId}] QR generation timeout. Current status: ${currentStatus}`);
+            if (session?.socket?.ws) {
+                console.log(`[${sessionId}] WebSocket state: ${session.socket.ws.readyState}`);
             }
+            
+            return res.json({
+                success: false,
+                message: 'QR code generation timeout. Check your internet connection and try again.',
+                sessionId: sessionId,
+                status: currentStatus,
+                debug: {
+                    hasSession: !!session,
+                    hasSocket: !!session?.socket,
+                    hasWebSocket: !!session?.socket?.ws,
+                    webSocketState: session?.socket?.ws?.readyState
+                }
+            });
         }
         
     } catch (error) {
-        console.error('Error adding session:', error);
+        console.error(`Error adding session:`, error);
         res.status(500).json({
             success: false,
             message: 'Failed to add session',
