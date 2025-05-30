@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model WhatsappSession {
+  id          Int      @id @default(autoincrement())
+  sessionId   String   @unique
+  status      String   // connecting, waiting_qr_scan, connected, disconnected, logged_out
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relasi ke chat history
+  chatHistory ChatHistory[]
+  
+  @@map("whatsapp_sessions")
+}
+
+model ChatHistory {
+  id          Int      @id @default(autoincrement())
+  sessionId   String
+  phoneNumber String
+  message     String   @db.Text
+  messageType String   // text, image, document, audio, video, etc
+  direction   String   // incoming, outgoing
+  metadata    String?  @db.Text // JSON string untuk menyimpan data tambahan
+  timestamp   DateTime @default(now())
+  
+  // Relasi ke session
+  session     WhatsappSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([phoneNumber])
+  @@index([timestamp])
+  @@map("chat_history")
+}
