@@ -140,6 +140,28 @@ function formatPhoneNumber(number) {
 async function createWhatsAppConnection(sessionId, options = {}) {
     try {
         const authDir = `auth_info_${sessionId}`;
+        
+        // Check if session already exists and is authenticated
+        if (sessions.has(sessionId)) {
+            const existingSession = sessions.get(sessionId);
+            if (existingSession.isAuthenticated) {
+                console.log(`Session ${sessionId} already authenticated, skipping creation`);
+                return existingSession;
+            }
+            
+            // Clean up existing session before recreating
+            console.log(`Cleaning up existing session ${sessionId} before recreating`);
+            if (existingSession.socket) {
+                try {
+                    await existingSession.socket.end();
+                } catch (error) {
+                    console.error('Error ending existing socket:', error);
+                }
+            }
+            sessions.delete(sessionId);
+            sessionQRs.delete(sessionId);
+        }
+        
         const { state, saveCreds } = await useMultiFileAuthState(authDir);
         
         await createSessionRecord(sessionId);
@@ -178,6 +200,7 @@ async function createWhatsAppConnection(sessionId, options = {}) {
                 
                 await updateSessionStatus(sessionId, 'disconnected');
                 sessionData.isAuthenticated = false;
+                sessionQRs.delete(sessionId); // Clear QR when disconnected
                 
                 if (shouldReconnect) {
                     setTimeout(() => createWhatsAppConnection(sessionId, options), 5000);
@@ -188,7 +211,7 @@ async function createWhatsAppConnection(sessionId, options = {}) {
             } else if (connection === 'open') {
                 console.log(`WhatsApp connection opened for session ${sessionId}`);
                 sessionData.isAuthenticated = true;
-                sessionQRs.delete(sessionId);
+                sessionQRs.delete(sessionId); // Clear QR when authenticated
                 await updateSessionStatus(sessionId, 'connected');
             }
         });
@@ -290,8 +313,57 @@ app.get('/sessions/:sessionId', authenticateApiKey, (req, res) => {
 app.get('/sessions/:sessionId/status', authenticateApiKey, (req, res) => {
     const { sessionId } = req.params;
     const status = getSessionStatus(sessionId);
+    const qr = sessionQRs.get(sessionId);
     
-    res.json({ status });
+    const response = { status };
+    
+    // Include QR code if available and not authenticated
+    if (qr && status !== 'AUTHENTICATED') {
+        response.qr = qr;
+    }
+    
+    res.json(response);
+});
+
+// GET - Get QR Code for session
+app.get('/sessions/:sessionId/qr', authenticateApiKey, (req, res) => {
+    const { sessionId } = req.params;
+    
+    if (!sessions.has(sessionId)) {
+        return res.status(404).json({
+            success: false,
+            message: 'Session not found'
+        });
+    }
+    
+    const sessionData = sessions.get(sessionId);
+    
+    // If already authenticated, no QR needed
+    if (sessionData.isAuthenticated) {
+        return res.json({
+            success: true,
+            message: 'Session already authenticated',
+            status: 'AUTHENTICATED'
+        });
+    }
+    
+    const qr = sessionQRs.get(sessionId);
+    if (qr) {
+        res.json({
+            success: true,
+            qr: qr,
+            message: 'Scan QR code with WhatsApp',
+            sessionId: sessionId,
+            status: getSessionStatus(sessionId)
+        });
+    } else {
+        res.json({
+            success: false,
+            message: 'QR code not available yet',
+            sessionId: sessionId,
+            status: getSessionStatus(sessionId)
+        });
+    }
 });
 
 // POST - Add Session
@@ -306,24 +378,89 @@ app.post('/sessions/add', authenticateApiKey, async (req, res) => {
             });
         }
         
+        // Check if session already exists
         if (sessions.has(sessionId)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Session already exists'
-            });
+            const existingSession = sessions.get(sessionId);
+            
+            // If session is authenticated, return success immediately
+            if (existingSession.isAuthenticated) {
+                return res.json({
+                    success: true,
+                    message: 'Session already authenticated',
+                    sessionId: sessionId,
+                    status: 'AUTHENTICATED'
+                });
+            }
+            
+            // If session exists but not authenticated, check if QR is available
+            const existingQR = sessionQRs.get(sessionId);
+            if (existingQR) {
+                return res.json({
+                    success: true,
+                    qr: existingQR,
+                    message: 'Session exists, scan QR code to authenticate',
+                    sessionId: sessionId,
+                    status: getSessionStatus(sessionId)
+                });
+            }
+            
+            // If no QR available, we'll continue to recreate the session
+            console.log(`Session ${sessionId} exists but no QR available, recreating...`);
         }
         
+        // Create or recreate the session
         await createWhatsAppConnection(sessionId, options);
         
-        // Tunggu sebentar untuk QR code
-        setTimeout(() => {
-            const qr = sessionQRs.get(sessionId);
-            if (qr) {
-                res.json({ qr });
+        // Wait for QR code generation
+        let attempts = 0;
+        const maxAttempts = 10; // 5 seconds total wait time
+        
+        const waitForQR = () => {
+            return new Promise((resolve) => {
+                const checkQR = () => {
+                    const qr = sessionQRs.get(sessionId);
+                    if (qr) {
+                        resolve(qr);
+                    } else if (attempts < maxAttempts) {
+                        attempts++;
+                        setTimeout(checkQR, 500); // Check every 500ms
+                    } else {
+                        resolve(null);
+                    }
+                };
+                checkQR();
+            });
+        };
+        
+        const qr = await waitForQR();
+        
+        if (qr) {
+            res.json({
+                success: true,
+                qr: qr,
+                message: 'QR code generated successfully',
+                sessionId: sessionId,
+                status: getSessionStatus(sessionId)
+            });
+        } else {
+            // Check if session became authenticated during wait
+            const sessionData = sessions.get(sessionId);
+            if (sessionData && sessionData.isAuthenticated) {
+                res.json({
+                    success: true,
+                    message: 'Session authenticated successfully',
+                    sessionId: sessionId,
+                    status: 'AUTHENTICATED'
+                });
             } else {
-                res.json({ message: 'Session created, waiting for QR code...' });
+                res.json({
+                    success: true,
+                    message: 'Session created, waiting for QR code generation...',
+                    sessionId: sessionId,
+                    status: getSessionStatus(sessionId)
+                });
             }
-        }, 2000);
+        }
         
     } catch (error) {
         console.error('Error adding session:', error);
