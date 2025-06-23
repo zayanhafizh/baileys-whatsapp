@@ -58,7 +58,7 @@ function getSessionStatus(sessionId) {
             case 1: return 'CONNECTED';
             case 2: return 'CLOSING';
             case 3: return 'DISCONNECTED';
-            default: return 'UNKNOWN';
+            default: return 'DISCONNECTED';
         }
     }
     
