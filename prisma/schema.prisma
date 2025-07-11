@@ -11,33 +11,46 @@ datasource db {
 }
 
 model WhatsappSession {
-  id          Int      @id @default(autoincrement())
-  sessionId   String   @unique
-  status      String   // connecting, waiting_qr_scan, connected, disconnected, logged_out
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  sessionId     String   @unique
+  status        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   
-  // Relasi ke chat history
-  chatHistory ChatHistory[]
+  // Relations
+  chatHistory   ChatHistory[]
+  authData      AuthData[]
   
   @@map("whatsapp_sessions")
 }
 
-model ChatHistory {
+model AuthData {
   id          Int      @id @default(autoincrement())
-  sessionId   String
-  phoneNumber String
-  message     String   @db.Text
-  messageType String   // text, image, document, audio, video, etc
-  direction   String   // incoming, outgoing
-  metadata    String?  @db.Text // JSON string untuk menyimpan data tambahan
-  timestamp   DateTime @default(now())
+  sessionId   String   
+  key         String   // Key name (e.g., 'creds.json', 'app-state-sync-version-critical_block.json')
+  value       String   @db.Text // JSON string value - using TEXT for large data
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   
-  // Relasi ke session
+  // Relations
   session     WhatsappSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
   
-  @@index([sessionId])
-  @@index([phoneNumber])
-  @@index([timestamp])
+  @@unique([sessionId, key])
+  @@map("auth_data")
+}
+
+model ChatHistory {
+  id            Int      @id @default(autoincrement())
+  sessionId     String
+  phoneNumber   String
+  message       String   @db.Text // Using TEXT for potentially long messages
+  messageType   String   @default("text")
+  direction     String   @default("outgoing")
+  metadata      String?  @db.Text // Using TEXT for JSON metadata
+  timestamp     DateTime @default(now())
+  
+  // Relations
+  session       WhatsappSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+  
   @@map("chat_history")
 }

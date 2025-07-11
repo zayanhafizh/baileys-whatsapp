@@ -2,10 +2,13 @@
   "name": "whatsapp-multi-session-api",
   "version": "2.0.0",
   "description": "WhatsApp Multi-Session API with authentication and database logging",
-  "main": "app.js",
+  "main": "dist/app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node dist/app.js",
+    "dev": "nodemon --exec ts-node src/app.ts",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "prod": "npm run build && npm start",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -15,33 +18,43 @@
     "db:reset": "prisma migrate reset",
     "test": "jest",
     "test:watch": "jest --watch",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "build": "echo 'No build step required'",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
     "docker:build": "docker build -t whatsapp-multi-session-api .",
     "docker:run": "docker run -p 3000:3000 whatsapp-multi-session-api",
     "clean:auth": "rm -rf auth_info_*",
+    "clean:dist": "rm -rf dist",
     "logs": "tail -f logs/app.log"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.18",
     "@prisma/client": "^5.7.0",
+    "@whiskeysockets/baileys": "^6.7.18",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
-    "cors": "^2.8.5",
+    "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
+    "module-alias": "^2.2.3",
     "morgan": "^1.10.0",
     "pino": "^8.16.2",
-    "qrcode": "^1.5.3",
-    "dotenv": "^16.3.1",
-    "express-validator": "^7.0.1"
+    "qrcode": "^1.5.3"
   },
   "devDependencies": {
-    "prisma": "^5.7.0",
-    "nodemon": "^3.0.2",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.10.5",
+    "@types/qrcode": "^1.5.5",
+    "@typescript-eslint/eslint-plugin": "^8.33.0",
+    "@typescript-eslint/parser": "^8.33.0",
+    "eslint": "^8.55.0",
     "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "prisma": "^5.7.0",
     "supertest": "^6.3.3",
-    "eslint": "^8.55.0"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   },
   "keywords": [
     "whatsapp",
@@ -65,5 +78,14 @@
   },
   "prisma": {
     "seed": "node prisma/seed.js"
+  },
+  "_moduleAliases": {
+    "@": "./dist",
+    "@/types": "./dist/types",
+    "@/utils": "./dist/utils",
+    "@/services": "./dist/services",
+    "@/controllers": "./dist/controllers",
+    "@/middleware": "./dist/middleware",
+    "@/routes": "./dist/routes"
   }
 }
