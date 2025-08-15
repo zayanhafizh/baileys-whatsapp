@@ -10,14 +10,68 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique @db.VarChar(50)
+  email     String   @unique @db.VarChar(100)
+  password  String   @db.VarChar(255) // Hashed password
+  fullName  String   @db.VarChar(100)
+  role      UserRole @default(ADMIN)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLogin DateTime?
+
+  // Relationships
+  sessions     WhatsappSession[]
+  apiKeys      UserApiKey[]
+  activityLogs UserActivityLog[]
+
+  @@map("users")
+}
+
+model UserApiKey {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  apiKey    String   @unique @db.VarChar(100)
+  name      String   @db.VarChar(100) 
+  isActive  Boolean  @default(true)
+  lastUsed  DateTime?
+  expiresAt DateTime? 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_api_keys")
+}
+
+model UserActivityLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  action    String   @db.VarChar(100) 
+  resource  String?  @db.VarChar(100) 
+  details   String?  @db.Text 
+  userAgent String?  @db.Text
+  createdAt DateTime @default(now())
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_activity_logs")
+}
+
 model WhatsappSession {
   id            Int      @id @default(autoincrement())
   sessionId     String   @unique
+  userId      Int      // Foreign key to User
   status        String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
   // Relations
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   chatHistory   ChatHistory[]
   authData      AuthData[]
   
@@ -53,4 +107,9 @@ model ChatHistory {
   session       WhatsappSession @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
   
   @@map("chat_history")
+}
+
+enum UserRole {
+  ADMIN
+  SUPERADMIN
 }
