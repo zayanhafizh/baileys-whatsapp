@@ -36,11 +36,11 @@
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
+    "module-alias": "^2.2.3",
     "morgan": "^1.10.0",
     "pino": "^8.16.2",
     "qrcode": "^1.5.3",
-    "serverless-http": "^4.0.0",
-    "tsconfig-paths": "^4.2.0"
+    "serverless-http": "^4.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -59,32 +59,22 @@
     "typescript": "^5.9.2",
     "vercel": "^47.0.5"
   },
-  "keywords": [
-    "whatsapp",
-    "api",
-    "baileys",
-    "express",
-    "prisma",
-    "multi-session",
-    "bot",
-    "automation"
-  ],
+  "_moduleAliases": {
+    "@": "src",
+    "@/types": "src/types",
+    "@/utils": "src/utils",
+    "@/services": "src/services",
+    "@/controllers": "src/controllers",
+    "@/middleware": "src/middleware",
+    "@/routes": "src/routes"
+  },
+  "keywords": ["whatsapp","api","baileys","express","prisma","multi-session","bot","automation"],
   "author": "Your Name",
   "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/yourusername/whatsapp-multi-session-api.git"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
-  },
+  "engines": { "node": ">=18.0.0", "npm": ">=8.0.0" },
+  "repository": { "type": "git", "url": "git+https://github.com/yourusername/whatsapp-multi-session-api.git" },
+  "prisma": { "seed": "node prisma/seed.js" },
   "types": "./dist/app.d.ts",
-  "bugs": {
-    "url": "https://github.com/yourusername/whatsapp-multi-session-api/issues"
-  },
+  "bugs": { "url": "https://github.com/yourusername/whatsapp-multi-session-api/issues" },
   "homepage": "https://github.com/yourusername/whatsapp-multi-session-api#readme"
 }

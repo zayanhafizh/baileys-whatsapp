@@ -2,8 +2,6 @@
 import express from 'express';
 import { config } from 'dotenv';
 
-// gunakan alias "@/..." sesuai tsconfig (akan di-resolve oleh tsconfig-paths/register
-// yang dipanggil di api/index.ts / server.ts)
 import { sessionRoutes, messageRoutes, legacyRoutes } from '@/routes';
 import {
   errorHandler,
@@ -20,7 +18,7 @@ app.use(express.json());
 app.use(requestLogger);
 app.use(corsHeaders);
 
-// health check sederhana
+// health check
 app.get('/health', (_req, res) => {
   res.json({ ok: true, env: process.env.NODE_ENV });
 });
@@ -30,7 +28,7 @@ app.use('/', sessionRoutes);
 app.use('/', messageRoutes);
 app.use('/', legacyRoutes);
 
-// error handler
+// error handlers
 app.use(notFoundHandler);
 app.use(errorHandler);
 
