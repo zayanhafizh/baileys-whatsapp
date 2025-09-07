@@ -28,7 +28,7 @@
     "logs": "tail -f logs/app.log"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.0",
+    "@prisma/client": "^5.22.0",
     "@whiskeysockets/baileys": "^6.7.18",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -68,13 +68,5 @@
     "@/middleware": "src/middleware",
     "@/routes": "src/routes"
   },
-  "keywords": ["whatsapp","api","baileys","express","prisma","multi-session","bot","automation"],
-  "author": "Your Name",
-  "license": "MIT",
-  "engines": { "node": ">=18.0.0", "npm": ">=8.0.0" },
-  "repository": { "type": "git", "url": "git+https://github.com/yourusername/whatsapp-multi-session-api.git" },
-  "prisma": { "seed": "node prisma/seed.js" },
-  "types": "./dist/app.d.ts",
-  "bugs": { "url": "https://github.com/yourusername/whatsapp-multi-session-api/issues" },
-  "homepage": "https://github.com/yourusername/whatsapp-multi-session-api#readme"
+  "engines": { "node": ">=18.0.0", "npm": ">=8.0.0" }
 }
