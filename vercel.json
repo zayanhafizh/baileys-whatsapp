@@ -1,4 +1,12 @@
 {
   "version": 2,
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": [
+        "src/**",
+        "tsconfig.json"
+      ]
+    }
+  },
   "routes": [{ "src": "/(.*)", "dest": "/api/index.ts" }]
 }
