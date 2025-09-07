@@ -4,13 +4,11 @@
   "description": "WhatsApp Multi-Session API with authentication and database logging",
   "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/server.js",                      
+    "start": "node dist/server.js",
     "dev": "nodemon --watch src --exec ts-node src/server.ts",
     "build": "tsc",
     "prod": "npm run build && npm start",
-
-    "postinstall": "prisma generate",                    
-
+    "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -18,9 +16,7 @@
     "db:studio": "prisma studio",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
-
     "deploy": "vercel --prod",
-
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.ts",
@@ -40,7 +36,6 @@
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
-    "module-alias": "^2.2.3",
     "morgan": "^1.10.0",
     "pino": "^8.16.2",
     "qrcode": "^1.5.3",
@@ -86,9 +81,6 @@
   },
   "prisma": {
     "seed": "node prisma/seed.js"
-  },
-  "_moduleAliases": {
-    "@": "dist/src"
   },
   "types": "./dist/app.d.ts",
   "bugs": {

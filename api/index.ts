@@ -1,8 +1,8 @@
+// api/index.ts
 import serverless from 'serverless-http';
 
-// Penting bila pakai path alias dari tsconfig (runtime TS di Vercel)
+// Penting: aktifkan resolver path alias dari tsconfig
 import 'tsconfig-paths/register';
-import 'module-alias/register';
 
 import app from '../src/app';
 

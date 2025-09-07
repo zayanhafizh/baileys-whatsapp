@@ -1,12 +1,17 @@
 // src/app.ts
-import 'module-alias/register';
-
 import express from 'express';
 import { config } from 'dotenv';
-import { sessionRoutes, messageRoutes, legacyRoutes } from '@/routes';
-import { errorHandler, notFoundHandler, requestLogger, corsHeaders } from '@/middleware';
 
-// Load env (lokal/CLI). Di Vercel env sudah diinject.
+// gunakan alias "@/..." sesuai tsconfig (akan di-resolve oleh tsconfig-paths/register
+// yang dipanggil di api/index.ts / server.ts)
+import { sessionRoutes, messageRoutes, legacyRoutes } from '@/routes';
+import {
+  errorHandler,
+  notFoundHandler,
+  requestLogger,
+  corsHeaders,
+} from '@/middleware';
+
 config();
 
 const app = express();
@@ -15,17 +20,17 @@ app.use(express.json());
 app.use(requestLogger);
 app.use(corsHeaders);
 
-// Endpoint sederhana buat health check
-app.get('/health', (req, res) => {
+// health check sederhana
+app.get('/health', (_req, res) => {
   res.json({ ok: true, env: process.env.NODE_ENV });
 });
 
-// Registrasi routes utama kamu
+// routes utama
 app.use('/', sessionRoutes);
 app.use('/', messageRoutes);
 app.use('/', legacyRoutes);
 
-// Error handlers
+// error handler
 app.use(notFoundHandler);
 app.use(errorHandler);
 
