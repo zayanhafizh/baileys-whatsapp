@@ -18,12 +18,23 @@ exports.sleep = sleep;
 exports.generateRandomString = generateRandomString;
 exports.sanitizeString = sanitizeString;
 exports.safeJsonParse = safeJsonParse;
+// Export all utility functions
 __exportStar(require("./phoneNumber"), exports);
 __exportStar(require("./session"), exports);
 __exportStar(require("./databaseAuth"), exports);
+/**
+ * Sleep utility function
+ * @param ms - Milliseconds to sleep
+ * @returns Promise that resolves after specified time
+ */
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+/**
+ * Generate random string
+ * @param length - Length of random string
+ * @returns Random alphanumeric string
+ */
 function generateRandomString(length = 8) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -32,9 +43,20 @@ function generateRandomString(length = 8) {
     }
     return result;
 }
+/**
+ * Sanitize string for safe usage
+ * @param str - String to sanitize
+ * @returns Sanitized string
+ */
 function sanitizeString(str) {
     return str.replace(/[<>\"'&]/g, '');
 }
+/**
+ * Parse JSON safely with fallback
+ * @param jsonString - JSON string to parse
+ * @param fallback - Fallback value if parsing fails
+ * @returns Parsed object or fallback
+ */
 function safeJsonParse(jsonString, fallback) {
     try {
         return JSON.parse(jsonString);

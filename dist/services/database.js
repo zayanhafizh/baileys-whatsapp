@@ -2,8 +2,18 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DatabaseService = exports.prisma = void 0;
 const client_1 = require("@prisma/client");
+// Initialize Prisma Client
 exports.prisma = new client_1.PrismaClient();
+/**
+ * Database Service Class
+ * Handles all database operations for WhatsApp sessions and chat history
+ */
 class DatabaseService {
+    /**
+     * Create or get session from database
+     * @param sessionId - Unique session identifier
+     * @returns Session record from database
+     */
     static async createSessionRecord(sessionId) {
         try {
             const existingSession = await exports.prisma.whatsappSession.findUnique({
@@ -34,6 +44,11 @@ class DatabaseService {
             return null;
         }
     }
+    /**
+     * Update session status in database
+     * @param sessionId - Session identifier
+     * @param status - New session status
+     */
     static async updateSessionStatus(sessionId, status) {
         try {
             await exports.prisma.whatsappSession.update({
@@ -48,6 +63,15 @@ class DatabaseService {
             console.error('Error updating session status:', error);
         }
     }
+    /**
+     * Save chat history to database
+     * @param sessionId - Session identifier
+     * @param phoneNumber - Phone number of contact
+     * @param message - Message content
+     * @param messageType - Type of message
+     * @param direction - Message direction (incoming/outgoing)
+     * @param metadata - Additional message metadata
+     */
     static async saveChatHistory(sessionId, phoneNumber, message, messageType = 'text', direction = 'outgoing', metadata = {}) {
         try {
             await exports.prisma.chatHistory.create({
@@ -66,6 +90,15 @@ class DatabaseService {
             console.error('Error saving chat history:', error);
         }
     }
+    /**
+     * Get chat history for a session
+     * @param sessionId - Session identifier
+     * @param phoneNumber - Optional phone number filter
+     * @param page - Page number for pagination
+     * @param limit - Number of records per page
+     * @param cursor - Cursor for cursor-based pagination
+     * @returns Chat history with pagination info
+     */
     static async getChatHistory(sessionId, phoneNumber, page = 1, limit = 25, cursor) {
         try {
             const where = { sessionId };
@@ -94,6 +127,12 @@ class DatabaseService {
             throw error;
         }
     }
+    /**
+     * Get sessions history with pagination
+     * @param page - Page number
+     * @param limit - Number of records per page
+     * @returns Sessions with pagination info
+     */
     static async getSessionsHistory(page = 1, limit = 20) {
         try {
             const sessions = await exports.prisma.whatsappSession.findMany({
@@ -122,11 +161,17 @@ class DatabaseService {
             throw error;
         }
     }
+    /**
+     * Delete session from database
+     * @param sessionId - Session identifier
+     */
     static async deleteSession(sessionId) {
         try {
+            // Delete related chat history first
             await exports.prisma.chatHistory.deleteMany({
                 where: { sessionId }
             });
+            // Delete session
             await exports.prisma.whatsappSession.delete({
                 where: { sessionId }
             });
@@ -135,6 +180,12 @@ class DatabaseService {
             console.error('Error deleting session:', error);
         }
     }
+    /**
+     * Save authentication data to database
+     * @param sessionId - Session identifier
+     * @param key - Authentication key name
+     * @param value - Authentication data value
+     */
     static async saveAuthData(sessionId, key, value) {
         try {
             await exports.prisma.authData.upsert({
@@ -162,6 +213,11 @@ class DatabaseService {
             throw error;
         }
     }
+    /**
+     * Get authentication data from database
+     * @param sessionId - Session identifier
+     * @returns Array of authentication data
+     */
     static async getAuthData(sessionId) {
         try {
             const authData = await exports.prisma.authData.findMany({
@@ -178,6 +234,10 @@ class DatabaseService {
             return [];
         }
     }
+    /**
+     * Clear all authentication data for a session
+     * @param sessionId - Session identifier
+     */
     static async clearAuthData(sessionId) {
         try {
             await exports.prisma.authData.deleteMany({
@@ -188,6 +248,9 @@ class DatabaseService {
             console.error('Error clearing auth data:', error);
         }
     }
+    /**
+     * Disconnect from database
+     */
     static async disconnect() {
         await exports.prisma.$disconnect();
     }

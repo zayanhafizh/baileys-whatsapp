@@ -5,10 +5,17 @@ exports.SessionController = void 0;
 const services_1 = require("@/services");
 const utils_1 = require("@/utils");
 const middleware_1 = require("@/middleware");
+/**
+ * Session Controller
+ * Handles all session-related API endpoints
+ */
 class SessionController {
 }
 exports.SessionController = SessionController;
 _a = SessionController;
+/**
+ * GET /sessions - List all active sessions
+ */
 SessionController.listSessions = (0, middleware_1.asyncHandler)(async (req, res) => {
     const sessions = services_1.WhatsAppService.getSessions();
     const sessionList = [];
@@ -20,6 +27,9 @@ SessionController.listSessions = (0, middleware_1.asyncHandler)(async (req, res)
     }
     res.json(sessionList);
 });
+/**
+ * GET /sessions/:sessionId - Find specific session
+ */
 SessionController.findSession = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.params;
     const sessions = services_1.WhatsAppService.getSessions();
@@ -40,6 +50,9 @@ SessionController.findSession = (0, middleware_1.asyncHandler)(async (req, res) 
         });
     }
 });
+/**
+ * GET /sessions/:sessionId/status - Get session status
+ */
 SessionController.getSessionStatus = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.params;
     const sessions = services_1.WhatsAppService.getSessions();
@@ -47,11 +60,15 @@ SessionController.getSessionStatus = (0, middleware_1.asyncHandler)(async (req, 
     const status = (0, utils_1.getSessionStatus)(sessionId, sessions);
     const qr = sessionQRs.get(sessionId);
     const response = { status };
+    // Include QR code if available and not authenticated
     if (qr && status !== 'AUTHENTICATED') {
         response.qr = qr;
     }
     res.json(response);
 });
+/**
+ * GET /sessions/:sessionId/qr - Get QR code for session
+ */
 SessionController.getQRCode = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.params;
     const sessions = services_1.WhatsAppService.getSessions();
@@ -63,6 +80,7 @@ SessionController.getQRCode = (0, middleware_1.asyncHandler)(async (req, res) =>
         });
     }
     const sessionData = sessions.get(sessionId);
+    // If already authenticated, no QR needed
     if (sessionData.isAuthenticated) {
         return res.json({
             success: true,
@@ -91,6 +109,9 @@ SessionController.getQRCode = (0, middleware_1.asyncHandler)(async (req, res) =>
         res.json(response);
     }
 });
+/**
+ * POST /sessions/add - Add new session
+ */
 SessionController.addSession = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId, ...options } = req.body;
     if (!sessionId) {
@@ -107,8 +128,10 @@ SessionController.addSession = (0, middleware_1.asyncHandler)(async (req, res) =
     }
     const sessions = services_1.WhatsAppService.getSessions();
     const sessionQRs = services_1.WhatsAppService.getSessionQRs();
+    // Check if session already exists
     if (sessions.has(sessionId)) {
         const existingSession = sessions.get(sessionId);
+        // If session is authenticated, return success immediately
         if (existingSession.isAuthenticated) {
             return res.json({
                 success: true,
@@ -117,6 +140,7 @@ SessionController.addSession = (0, middleware_1.asyncHandler)(async (req, res) =
                 status: 'AUTHENTICATED'
             });
         }
+        // If session exists but not authenticated, check if QR is available
         const existingQR = sessionQRs.get(sessionId);
         if (existingQR) {
             return res.json({
@@ -131,7 +155,9 @@ SessionController.addSession = (0, middleware_1.asyncHandler)(async (req, res) =
     }
     console.log(`[${sessionId}] Creating new WhatsApp connection...`);
     try {
+        // Create or recreate the session
         await services_1.WhatsAppService.createConnection(sessionId, options);
+        // Wait for QR code generation
         const qrResult = await services_1.WhatsAppService.waitForQR(sessionId);
         if (qrResult === 'authenticated') {
             return res.json({
@@ -151,6 +177,7 @@ SessionController.addSession = (0, middleware_1.asyncHandler)(async (req, res) =
             });
         }
         else {
+            // QR timeout - check current status
             const currentStatus = (0, utils_1.getSessionStatus)(sessionId, sessions);
             const session = sessions.get(sessionId);
             console.log(`[${sessionId}] QR generation timeout. Current status: ${currentStatus}`);
@@ -176,6 +203,9 @@ SessionController.addSession = (0, middleware_1.asyncHandler)(async (req, res) =
         });
     }
 });
+/**
+ * DELETE /sessions/:sessionId - Delete session
+ */
 SessionController.deleteSession = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.params;
     try {
@@ -194,6 +224,9 @@ SessionController.deleteSession = (0, middleware_1.asyncHandler)(async (req, res
         });
     }
 });
+/**
+ * GET /sessions-history - Get sessions history
+ */
 SessionController.getSessionsHistory = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { page = '1', limit = '20' } = req.query;
     try {

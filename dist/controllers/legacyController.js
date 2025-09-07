@@ -5,10 +5,17 @@ exports.LegacyController = void 0;
 const services_1 = require("@/services");
 const utils_1 = require("@/utils");
 const middleware_1 = require("@/middleware");
+/**
+ * Legacy Controller
+ * Handles backward compatibility endpoints
+ */
 class LegacyController {
 }
 exports.LegacyController = LegacyController;
 _a = LegacyController;
+/**
+ * GET /status - Backward compatibility status endpoint
+ */
 LegacyController.getStatus = (0, middleware_1.asyncHandler)(async (req, res) => {
     const sessions = services_1.WhatsAppService.getSessions();
     const activeSessions = Array.from(sessions.entries()).map(([id, data]) => ({
@@ -22,6 +29,9 @@ LegacyController.getStatus = (0, middleware_1.asyncHandler)(async (req, res) => 
         totalSessions: sessions.size
     });
 });
+/**
+ * GET /qr - Backward compatibility QR endpoint
+ */
 LegacyController.getQR = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.query;
     if (!sessionId || typeof sessionId !== 'string') {

@@ -5,10 +5,17 @@ exports.MessageController = void 0;
 const services_1 = require("@/services");
 const utils_1 = require("@/utils");
 const middleware_1 = require("@/middleware");
+/**
+ * Message Controller
+ * Handles all message-related API endpoints
+ */
 class MessageController {
 }
 exports.MessageController = MessageController;
 _a = MessageController;
+/**
+ * POST /:sessionId/messages/send - Send single message
+ */
 MessageController.sendMessage = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.params;
     const { jid, type, message, options = {} } = req.body;
@@ -46,6 +53,9 @@ MessageController.sendMessage = (0, middleware_1.asyncHandler)(async (req, res) 
         });
     }
 });
+/**
+ * POST /:sessionId/messages/send/bulk - Send bulk messages
+ */
 MessageController.sendBulkMessages = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.params;
     const messages = req.body;
@@ -101,6 +111,9 @@ MessageController.sendBulkMessages = (0, middleware_1.asyncHandler)(async (req, 
         });
     }
 });
+/**
+ * GET /:sessionId/chats/:jid? - Get chat history
+ */
 MessageController.getChatHistory = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId, jid } = req.params;
     const { page = '1', limit = '25', cursor } = req.query;
@@ -124,6 +137,9 @@ MessageController.getChatHistory = (0, middleware_1.asyncHandler)(async (req, re
         });
     }
 });
+/**
+ * GET /:sessionId/contacts - Get contact list
+ */
 MessageController.getContacts = (0, middleware_1.asyncHandler)(async (req, res) => {
     const { sessionId } = req.params;
     const { limit = '25', cursor, search } = req.query;
@@ -136,6 +152,8 @@ MessageController.getContacts = (0, middleware_1.asyncHandler)(async (req, res) 
         });
     }
     try {
+        // For now, return empty array as contact implementation depends on Baileys store
+        // This can be expanded later when implementing contact management
         res.json({
             success: true,
             data: [],

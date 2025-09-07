@@ -3,6 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.useDatabaseAuthState = useDatabaseAuthState;
 const baileys_1 = require("@whiskeysockets/baileys");
 const database_1 = require("@/services/database");
+/**
+ * Serialize data to JSON with binary support
+ */
 function serializeData(data) {
     try {
         return JSON.stringify(data, (key, value) => {
@@ -32,6 +35,9 @@ function serializeData(data) {
         return '{}';
     }
 }
+/**
+ * Deserialize JSON data with binary support
+ */
 function deserializeData(jsonString) {
     try {
         return JSON.parse(jsonString, (key, value) => {
@@ -51,15 +57,23 @@ function deserializeData(jsonString) {
         return {};
     }
 }
+/**
+ * Database-based authentication state for WhatsApp
+ * Replaces file system storage with database storage
+ */
 async function useDatabaseAuthState(sessionId) {
+    // Initialize with default credentials
     let creds = (0, baileys_1.initAuthCreds)();
     const keys = {};
+    // Load existing auth data from database
     const authDataList = await database_1.DatabaseService.getAuthData(sessionId);
     console.log(`[${sessionId}] Loading auth data from database, found ${authDataList.length} entries`);
+    // Parse credentials
     const credsData = authDataList.find(data => data.key === 'creds.json');
     if (credsData) {
         try {
             const parsedCreds = deserializeData(credsData.value);
+            // Validate credentials structure
             if (parsedCreds && typeof parsedCreds === 'object' && parsedCreds.noiseKey) {
                 creds = parsedCreds;
                 console.log(`[${sessionId}] Loaded valid credentials from database`);
@@ -74,6 +88,7 @@ async function useDatabaseAuthState(sessionId) {
             creds = (0, baileys_1.initAuthCreds)();
         }
     }
+    // Parse keys
     authDataList.forEach(data => {
         if (data.key !== 'creds.json') {
             try {
@@ -115,7 +130,9 @@ async function useDatabaseAuthState(sessionId) {
     const saveCreds = async () => {
         try {
             console.log(`[${sessionId}] Saving credentials to database`);
+            // Save credentials with binary serialization
             await database_1.DatabaseService.saveAuthData(sessionId, 'creds.json', serializeData(creds));
+            // Save keys with binary serialization
             for (const keyType in keys) {
                 const keyData = keys[keyType];
                 if (keyData && typeof keyData === 'object' && Object.keys(keyData).length > 0) {
@@ -143,6 +160,9 @@ async function useDatabaseAuthState(sessionId) {
         clearAuth
     };
 }
+/**
+ * Get key type from file name
+ */
 function getKeyTypeFromFileName(fileName) {
     const keyTypeMap = {
         'app-state-sync-key.json': 'app-state-sync-key',

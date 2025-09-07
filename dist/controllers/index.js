@@ -14,6 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// Export all controllers
 __exportStar(require("./sessionController"), exports);
 __exportStar(require("./messageController"), exports);
 __exportStar(require("./legacyController"), exports);

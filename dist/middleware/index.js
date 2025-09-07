@@ -15,14 +15,23 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.corsHeaders = exports.requestLogger = void 0;
+// Export all middleware
 __exportStar(require("./auth"), exports);
 __exportStar(require("./errorHandler"), exports);
+/**
+ * Request Logging Middleware
+ * Logs incoming requests for debugging
+ */
 const requestLogger = (req, res, next) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${req.method} ${req.url} - IP: ${req.ip}`);
     next();
 };
 exports.requestLogger = requestLogger;
+/**
+ * CORS Headers Middleware
+ * Adds CORS headers for API access
+ */
 const corsHeaders = (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

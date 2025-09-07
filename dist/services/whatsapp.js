@@ -11,22 +11,43 @@ const pino_1 = __importDefault(require("pino"));
 const utils_1 = require("@/utils");
 const databaseAuth_1 = require("@/utils/databaseAuth");
 const database_1 = require("./database");
+// Logger
 const logger = (0, pino_1.default)({ level: 'silent' });
+/**
+ * WhatsApp Service Class
+ * Handles WhatsApp connections, messaging, and session management
+ */
 class WhatsAppService {
+    /**
+     * Get all active sessions
+     * @returns Map of active sessions
+     */
     static getSessions() {
         return this.sessions;
     }
+    /**
+     * Get session QR codes
+     * @returns Map of session QR codes
+     */
     static getSessionQRs() {
         return this.sessionQRs;
     }
+    /**
+     * Create WhatsApp connection for a session
+     * @param sessionId - Unique session identifier
+     * @param options - Connection options
+     * @returns Session data
+     */
     static async createConnection(sessionId, options = {}) {
         try {
+            // Check if session already exists and is authenticated
             if (this.sessions.has(sessionId)) {
                 const existingSession = this.sessions.get(sessionId);
                 if (existingSession.isAuthenticated) {
                     console.log(`Session ${sessionId} already authenticated, skipping creation`);
                     return existingSession;
                 }
+                // Clean up existing session before recreating
                 console.log(`Cleaning up existing session ${sessionId} before recreating`);
                 if (existingSession.socket) {
                     try {
@@ -39,13 +60,16 @@ class WhatsAppService {
                 this.sessions.delete(sessionId);
                 this.sessionQRs.delete(sessionId);
             }
+            // Clean up any existing auth folder (legacy cleanup)
             const authDir = `auth_info_${sessionId}`;
             if (fs_1.default.existsSync(authDir)) {
                 console.log(`Removing legacy auth directory: ${authDir}`);
                 fs_1.default.rmSync(authDir, { recursive: true, force: true });
             }
+            // Use database auth state instead of file system
             const { state, saveCreds, clearAuth } = await (0, databaseAuth_1.useDatabaseAuthState)(sessionId);
             await database_1.DatabaseService.createSessionRecord(sessionId);
+            // Enhanced socket configuration
             const socket = (0, baileys_1.makeWASocket)({
                 auth: state,
                 logger,
@@ -72,24 +96,36 @@ class WhatsAppService {
             const sessionData = {
                 socket,
                 isAuthenticated: false,
-                authDir: `db_auth_${sessionId}`,
+                authDir: `db_auth_${sessionId}`, // Just for reference, not used for actual storage
                 status: 'connecting',
                 startTime: Date.now()
             };
             this.sessions.set(sessionId, sessionData);
+            // Set up event handlers
             this.setupEventHandlers(sessionId, socket, sessionData, saveCreds, clearAuth);
             return sessionData;
         }
         catch (error) {
             console.error(`[${sessionId}] Error creating WhatsApp connection:`, error);
+            // Clean up on error
             this.sessions.delete(sessionId);
             this.sessionQRs.delete(sessionId);
             throw error;
         }
     }
+    /**
+     * Setup event handlers for WhatsApp socket
+     * @param sessionId - Session identifier
+     * @param socket - WhatsApp socket
+     * @param sessionData - Session data
+     * @param saveCreds - Save credentials function
+     * @param clearAuth - Clear auth function
+     */
     static setupEventHandlers(sessionId, socket, sessionData, saveCreds, clearAuth) {
+        // Track reconnection attempts
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 3;
+        // Enhanced event handler for connection updates
         socket.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr, isNewLogin, isOnline } = update;
             console.log(`[${sessionId}] Connection update:`, {
@@ -149,6 +185,7 @@ class WhatsAppService {
                     console.log(`[${sessionId}] Session logged out, cleaning up...`);
                     this.sessions.delete(sessionId);
                     this.sessionQRs.delete(sessionId);
+                    // Clear auth data from database on logout
                     await clearAuth();
                 }
             }
@@ -159,9 +196,10 @@ class WhatsAppService {
             else if (connection === 'open') {
                 console.log(`[${sessionId}] WhatsApp connection opened successfully`);
                 sessionData.isAuthenticated = true;
-                reconnectAttempts = 0;
+                reconnectAttempts = 0; // Reset reconnection attempts on successful connection
                 this.sessionQRs.delete(sessionId);
                 await database_1.DatabaseService.updateSessionStatus(sessionId, 'connected');
+                // Get and log connection info
                 try {
                     const info = socket.user;
                     console.log(`[${sessionId}] Authenticated as:`, {
@@ -175,6 +213,7 @@ class WhatsAppService {
                 }
             }
         });
+        // Enhanced event handler for credentials update
         socket.ev.on('creds.update', async () => {
             try {
                 await saveCreds();
@@ -184,6 +223,7 @@ class WhatsAppService {
                 console.error(`[${sessionId}] Error saving credentials:`, error);
             }
         });
+        // Event handler for incoming messages
         socket.ev.on('messages.upsert', async (messageUpdate) => {
             const { messages } = messageUpdate;
             for (const message of messages) {
@@ -232,17 +272,30 @@ class WhatsAppService {
             }
         });
     }
+    /**
+     * Send message through WhatsApp
+     * @param sessionId - Session identifier
+     * @param jid - Target JID
+     * @param message - Message content
+     * @param options - Message options
+     * @returns Message result
+     */
     static async sendMessage(sessionId, jid, message, options = {}) {
         const sessionData = this.sessions.get(sessionId);
         if (!sessionData || !sessionData.isAuthenticated || !sessionData.socket) {
             throw new Error('Session not found or not authenticated');
         }
         const result = await sessionData.socket.sendMessage(jid, message, options);
+        // Save to database
         const phoneNumber = (0, utils_1.extractPhoneNumber)(jid);
         const messageText = message.text || JSON.stringify(message);
         await database_1.DatabaseService.saveChatHistory(sessionId, phoneNumber, messageText, 'text', 'outgoing');
         return result;
     }
+    /**
+     * Delete session and cleanup
+     * @param sessionId - Session identifier
+     */
     static async deleteSession(sessionId) {
         const sessionData = this.sessions.get(sessionId);
         if (sessionData) {
@@ -255,12 +308,19 @@ class WhatsAppService {
                     console.error(`Error ending session ${sessionId}:`, error);
                 }
             }
+            // Clear auth data from database
             await database_1.DatabaseService.clearAuthData(sessionId);
             this.sessions.delete(sessionId);
             this.sessionQRs.delete(sessionId);
             await database_1.DatabaseService.updateSessionStatus(sessionId, 'logged_out');
         }
     }
+    /**
+     * Wait for QR code generation
+     * @param sessionId - Session identifier
+     * @param maxAttempts - Maximum attempts to wait
+     * @returns QR code or authentication status
+     */
     static async waitForQR(sessionId, maxAttempts = 20) {
         let attempts = 0;
         return new Promise((resolve) => {

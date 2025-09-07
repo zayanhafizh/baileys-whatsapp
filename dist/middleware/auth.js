@@ -1,6 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.optionalAuth = exports.authenticateApiKey = void 0;
+/**
+ * API Key Authentication Middleware
+ * Validates API key from headers before allowing access to protected routes
+ */
 const authenticateApiKey = (req, res, next) => {
     const apiKey = req.headers['x-api-key'] ||
         req.headers['authorization']?.toString().replace('Bearer ', '');
@@ -21,10 +25,15 @@ const authenticateApiKey = (req, res, next) => {
         });
         return;
     }
+    // Add API key to request for later use
     req.apiKey = apiKey;
     next();
 };
 exports.authenticateApiKey = authenticateApiKey;
+/**
+ * Optional API Key Authentication Middleware
+ * Validates API key if present but doesn't require it
+ */
 const optionalAuth = (req, res, next) => {
     const apiKey = req.headers['x-api-key'] ||
         req.headers['authorization']?.toString().replace('Bearer ', '');
